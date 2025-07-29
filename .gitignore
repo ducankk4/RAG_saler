@@ -1,0 +1,6 @@
+venv/
+test.ipynb
+data/chroma_db/
+*.pyc
+.env
+__pycache__/
