@@ -1,7 +1,7 @@
 from src.chroma_store import ChromaEngine
 from utils.reranker import Reranker
 from langchain_groq import ChatGroq
-from utils.prompt_template import PROMPT_LLM_RESPONSE, PROMPT_QUERY_ROUTER, PROMPT_REWRITE_QUERY
+from utils.prompt_template import PROMPT_LLM_RESPONSE, PROMPT_QUERY_ROUTER, PROMPT_REWRITE_QUERY, PROMPT_OTHER_QUERY_RESPONSE
 from dotenv import load_dotenv
 import os
 class PipeLine:
@@ -13,6 +13,7 @@ class PipeLine:
         self.query_router_prompt = PROMPT_QUERY_ROUTER
         self.llm_response_prompt = PROMPT_LLM_RESPONSE
         self.rewrite_query_prompt = PROMPT_REWRITE_QUERY
+        self.other_query_response_prompt = PROMPT_OTHER_QUERY_RESPONSE
     
     def call_llm(self, query: str, prompt: str) -> str:
         llm = ChatGroq(
@@ -41,7 +42,7 @@ class PipeLine:
         return response
     
     def solve_other_query(self, query: str) -> str:
-        response = self.call_llm(query, self.llm_response_prompt.format(context=""))
+        response = self.call_llm(query, self.other_query_response_prompt)
         return response
     
     def main(self, query: str) -> str:
@@ -56,7 +57,7 @@ class PipeLine:
 
 if __name__ == "__main__":
     pipeline = PipeLine()
-    query = "bên em có bán đèn ngủ tiết kiệm điện không nhỉ"
+    query = "đèn led NLMT giá tốt"
     response = pipeline.main(query)
     print(f"Response: {response}")
           
