@@ -17,4 +17,5 @@ class Reranker:
         
         top_k_documents = list(sorted(zip(page_contents, scores), key = lambda x: x[1], reverse=True))
         top_k_page_contents = [doc for doc, score in top_k_documents[:5]]
+        print(f"Top 5 documents after reranking: {top_k_page_contents}")
         return top_k_page_contents

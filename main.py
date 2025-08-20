@@ -1,7 +1,8 @@
 from src.chroma_store import ChromaEngine
 from utils.reranker import Reranker
 from langchain_groq import ChatGroq
-from utils.prompt_template import PROMPT_LLM_RESPONSE, PROMPT_QUERY_ROUTER, PROMPT_REWRITE_QUERY
+from utils.process_chat_history import ChatHistory
+from utils.prompt_template import PROMPT_LLM_RESPONSE, PROMPT_QUERY_ROUTER, PROMPT_REWRITE_QUERY, PROMPT_OTHER_QUERY_RESPONSE
 from dotenv import load_dotenv
 import os
 class PipeLine:
@@ -10,9 +11,11 @@ class PipeLine:
     def __init__(self):
         self.chroma_engine = ChromaEngine()
         self.reranker = Reranker()
+        self.chat_history = ChatHistory()
         self.query_router_prompt = PROMPT_QUERY_ROUTER
         self.llm_response_prompt = PROMPT_LLM_RESPONSE
         self.rewrite_query_prompt = PROMPT_REWRITE_QUERY
+        self.other_query_response_prompt = PROMPT_OTHER_QUERY_RESPONSE
     
     def call_llm(self, query: str, prompt: str) -> str:
         llm = ChatGroq(
@@ -32,31 +35,48 @@ class PipeLine:
     
     def query_router(self, query: str) -> str:
         type_of_query = self.call_llm(query, self.query_router_prompt)
-        print(f"Query type: {type_of_query}")
         return type_of_query
     
-    def solve_sale_query(self, query: str, text: list[str]) -> str:
+    def handle_retrieval_query(self, query: str, text: list[str], history : str) -> str:
         context = "\n".join(text)
-        response = self.call_llm(query, self.llm_response_prompt.format(context=context))
+        response = self.call_llm(query, self.llm_response_prompt.format(context=context, chat_history = history))
         return response
     
-    def solve_other_query(self, query: str) -> str:
-        response = self.call_llm(query, self.llm_response_prompt.format(context=""))
+    def handle_flowup_query(self, query: str, chat_history: str):
+        context = ""
+        prompt = self.llm_response_prompt.format(context=context, chat_history=chat_history)
+        response = self.call_llm(query, prompt)
+        return response
+    
+    def hanfle_other_query(self, query: str, chat_history: str) -> str:
+        prompt = self.other_query_response_prompt.format(chat_history=chat_history)
+        response = self.call_llm(query, prompt)
         return response
     
     def main(self, query: str) -> str:
         query_type = self.query_router(query)
-        if query_type == "mua bán":
-            documents = self.chroma_engine.get_retriever(query)
-            texts= self.reranker.reranking(query, documents)
-            response = self.solve_sale_query(query, texts)
+        print(f"_____Type_query______ : {query_type}" )
+        chat_history = self.chat_history.get_history()
+        print(f"_____Chat history______ : {chat_history}" )
+
+        if query_type == "tìm kiếm":
+            rewrited_query_prompt = self.rewrite_query_prompt.format(chat_history=chat_history)
+            rewrited_query = self.call_llm(query, self.rewrite_query_prompt)
+            print(f"________Rewrited query_______: {rewrited_query}")
+            documents = self.chroma_engine.get_retriever(rewrited_query)
+            texts= self.reranker.reranking(rewrited_query, documents)
+            response = self.handle_retrieval_query(query, texts, chat_history)
+        elif query_type == "tiếp tục":
+            response = self.handle_flowup_query(query, self.chat_history.get_history())
         else:
-            response = self.solve_other_query(query)
+            response = self.hanfle_other_query(query, self.chat_history.get_history())
+        
+        self.chat_history.add_message(query, response)
         return response
 
-if __name__ == "__main__":
-    pipeline = PipeLine()
-    query = "bên em có bán đèn ngủ tiết kiệm điện không nhỉ"
-    response = pipeline.main(query)
-    print(f"Response: {response}")
+# if __name__ == "__main__":
+#     pipeline = PipeLine()
+#     query = "đèn led NLMT giá tốt"
+#     response = pipeline.main(query)
+#     print(f"Response: {response}")
           

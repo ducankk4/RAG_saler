@@ -45,20 +45,24 @@ class ChromaEngine:
     def inges_data(self):
         try:
             embedding = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            if not os.path.exists(self.data_path):
+            db_file = os.path.join(self.data_path, "chroma.sqlite3")
+            if not os.path.exists(db_file):
                 vector_store = Chroma.from_documents(
                     documents=self.load_data(),
                     embedding_function = embedding,
                     collection_name="economics",
                     persist_directory=self.data_path
                 )
+                print("_____data has been created successfully _____")
                 return vector_store
             else:
                 vector_store = Chroma(
                     collection_name="economics",
                     embedding_function=embedding,
-                    persist_directory=self.data_path
+                    # persist_directory=self.data_path
                 )
+                print("_____data has been loaded successfully _____")
+                print(f"____Number of documents in vector store: {len(vector_store)}______")
                 return vector_store
         except Exception as e:
             print(f"Error: {e}")
@@ -79,6 +83,7 @@ class ChromaEngine:
         try:
             retrieval_docs = ensemble_retriever.invoke(query)
             if retrieval_docs:
+                print(f"Retrieved {len(retrieval_docs)} documents for the query: {query}")
                 return retrieval_docs
             else :
                 print("No documents found for the query.")
