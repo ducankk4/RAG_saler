@@ -6,7 +6,7 @@ pipeline = PipeLine()
 def chat_fn(user_input):
     return pipeline.main(user_input)
 
-iface = gr.Interface(
+demo = gr.Interface(
     fn=chat_fn,
     inputs=gr.Textbox(lines=2, placeholder="Nhập câu hỏi..."),
     outputs="text",
@@ -15,4 +15,4 @@ iface = gr.Interface(
 )
 
 if __name__ == "__main__":
-    iface.launch(debug=True)
+    demo.launch()

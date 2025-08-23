@@ -59,10 +59,9 @@ class ChromaEngine:
                 vector_store = Chroma(
                     collection_name="economics",
                     embedding_function=embedding,
-                    # persist_directory=self.data_path
+                    persist_directory=self.data_path
                 )
                 print("_____data has been loaded successfully _____")
-                print(f"____Number of documents in vector store: {len(vector_store)}______")
                 return vector_store
         except Exception as e:
             print(f"Error: {e}")

@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trợ lí viên ADUC </title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <span class="icon icon-bot" aria-hidden="true">🤖</span>
+        <h1>Trợ lí viên ADUC</h1>
+      </div>
+      <div class="actions">
+        <button class="btn icon-btn" id="themeToggle" aria-label="Chuyển chủ đề">
+          <span class="icon" id="themeIcon">☀️</span>
+          <span class="btn-text">Light</span>
+        </button>
+        <button class="btn icon-btn" id="clearChat" aria-label="Xoá hội thoại">
+          <span class="icon">🗑️</span>
+          <span class="btn-text">Clear</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container chat">
+    <div id="messages" class="messages" aria-live="polite"></div>
+    <div id="end"></div>
+  </main>
+
+  <footer class="composer-wrap">
+    <div class="container">
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="Nhập tin nhắn... (Enter để gửi, Shift+Enter để xuống dòng)"></textarea>
+        <div class="composer-bottom">
+          <div class="hint" id="hint"><span class="spinner hidden" id="spinner"></span><span id="hintText">Tip: Hỏi về sản phẩm, so sánh, hoặc tiếp nối cuộc hội thoại.</span></div>
+          <div class="controls">
+            <button class="btn send" id="sendBtn" aria-label="Gửi">✉️ <span class="btn-text">Gửi</span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <template id="tpl-assistant">
+    <div class="msg row start">
+      <div class="avatar bot">🤖</div>
+      <div class="bubble assistant"><div class="content"></div></div>
+    </div>
+  </template>
+  <template id="tpl-user">
+    <div class="msg row end">
+      <div class="bubble user"><div class="content"></div></div>
+      <div class="avatar user">🧑</div>
+    </div>
+  </template>
+  <script src="script.js"></script>
+</body>
+</html>

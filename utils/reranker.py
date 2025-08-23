@@ -8,6 +8,7 @@ class Reranker:
 
     def __init__(self):
         self.model = CrossEncoder(os.getenv("MODEL_RERANKER_NAME"))
+        self.nums_docs = 3
 
     def reranking(self, query : str, documents : list[Document]) -> list[str]:
         page_contents = []
@@ -16,6 +17,6 @@ class Reranker:
         scores = self.model.predict([(query, page_content) for page_content in page_contents])
         
         top_k_documents = list(sorted(zip(page_contents, scores), key = lambda x: x[1], reverse=True))
-        top_k_page_contents = [doc for doc, score in top_k_documents[:5]]
+        top_k_page_contents = [doc for doc, score in top_k_documents[:self.nums_docs]]
         print(f"Top 5 documents after reranking: {top_k_page_contents}")
         return top_k_page_contents

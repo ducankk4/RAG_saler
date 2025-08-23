@@ -20,7 +20,7 @@ class PipeLine:
     def call_llm(self, query: str, prompt: str) -> str:
         llm = ChatGroq(
             model=os.getenv("MODEL_LLM_NAME"),
-            temperature=0.2,
+            temperature=0,
             max_tokens=None,
             reasoning_format="parsed",
             timeout=None,
@@ -37,9 +37,9 @@ class PipeLine:
         type_of_query = self.call_llm(query, self.query_router_prompt)
         return type_of_query
     
-    def handle_retrieval_query(self, query: str, text: list[str], history : str) -> str:
+    def handle_retrieval_query(self, query: str, text: list[str], chat_history : str) -> str:
         context = "\n".join(text)
-        response = self.call_llm(query, self.llm_response_prompt.format(context=context, chat_history = history))
+        response = self.call_llm(query, self.llm_response_prompt.format(context=context, chat_history = chat_history))
         return response
     
     def handle_flowup_query(self, query: str, chat_history: str):
@@ -58,15 +58,14 @@ class PipeLine:
         print(f"_____Type_query______ : {query_type}" )
         chat_history = self.chat_history.get_history()
         print(f"_____Chat history______ : {chat_history}" )
-
-        if query_type == "tìm kiếm":
+        if "tìm kiếm" in query_type:
             rewrited_query_prompt = self.rewrite_query_prompt.format(chat_history=chat_history)
-            rewrited_query = self.call_llm(query, self.rewrite_query_prompt)
+            rewrited_query = self.call_llm(query, rewrited_query_prompt)
             print(f"________Rewrited query_______: {rewrited_query}")
             documents = self.chroma_engine.get_retriever(rewrited_query)
             texts= self.reranker.reranking(rewrited_query, documents)
             response = self.handle_retrieval_query(query, texts, chat_history)
-        elif query_type == "tiếp tục":
+        elif "tiếp tục" in query_type:
             response = self.handle_flowup_query(query, self.chat_history.get_history())
         else:
             response = self.hanfle_other_query(query, self.chat_history.get_history())
