@@ -1,129 +1,330 @@
-// Theme
-const html = document.documentElement;
-const themeToggle = document.getElementById('themeToggle');
-const themeIcon = document.getElementById('themeIcon');
-function setTheme(mode){
-    html.setAttribute('data-theme', mode);
-    themeIcon.textContent = mode === 'dark' ? '☀️' : '🌙';
-    themeToggle.querySelector('.btn-text').textContent = mode === 'dark' ? 'Light' : 'Dark';
-    localStorage.setItem('theme', mode);
-}
-setTheme(localStorage.getItem('theme') || 'dark');
-themeToggle.addEventListener('click', ()=>{
-    setTheme(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+// DOM Elements
+const chatMessages = document.getElementById('chatMessages');
+const messageInput = document.getElementById('messageInput');
+const sendButton = document.getElementById('sendButton');
+const typingIndicator = document.getElementById('typingIndicator');
+const quickActions = document.getElementById('quickActions');
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    initializeChatbot();
+    setupEventListeners();
+    setWelcomeTime();
+    checkApiConnection();
 });
 
-// Elements
-const messagesEl = document.getElementById('messages');
-const inputEl = document.getElementById('input');
-const sendBtn = document.getElementById('sendBtn');
-const clearBtn = document.getElementById('clearChat');
-const endEl = document.getElementById('end');
-const spinner = document.getElementById('spinner');
-const hintText = document.getElementById('hintText');
-
-// Templates
-const tplAssistant = document.getElementById('tpl-assistant');
-const tplUser = document.getElementById('tpl-user');
-
-// State
-const messages = [];
-
-// Utilities
-function scrollToBottom(){ endEl.scrollIntoView({ behavior: 'smooth', block: 'end' }); }
-function elFromTemplate(tpl){ return tpl.content.firstElementChild.cloneNode(true); }
-function addMessage(role, content){
-    const tpl = role === 'assistant' ? tplAssistant : tplUser;
-    const node = elFromTemplate(tpl);
-    node.querySelector('.content').innerHTML = renderMarkdownLite(content);
-    messagesEl.appendChild(node);
-    messages.push({ role, content });
-    scrollToBottom();
-}
-function setLoading(loading){
-    if(loading){ spinner.classList.remove('hidden'); hintText.textContent = 'Đang tạo câu trả lời...'; }
-    else { spinner.classList.add('hidden'); hintText.textContent = 'Tip: Hỏi về sản phẩm, so sánh, hoặc tiếp nối cuộc hội thoại.'; }
-}
-function renderMarkdownLite(text){
-    // very light markdown support: **bold**, *italic*, `code`
-    return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br/>');
-}
-
-// Fake backend (replace with your API)
-async function sendMessageToBackend(prompt){
-    // Gửi câu hỏi tới backend FastAPI và nhận phản hồi thực
+// Check API connection on startup
+async function checkApiConnection() {
     try {
-        const response = await fetch("http://localhost:8000/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: prompt })
-        });
-        if (!response.ok) {
-            throw new Error("Backend error");
+        const response = await fetch('/api/status');
+        if (response.ok) {
+            console.log('✅ API Connected Successfully');
+        } else {
+            console.warn('⚠️ API Connection Warning:', response.status);
         }
-        const data = await response.json();
-        return data.response;
-    } catch (err) {
-        return "⚠️ Không thể kết nối tới máy chủ. Vui lòng thử lại hoặc kiểm tra backend.";
+    } catch (error) {
+        console.error('❌ API Connection Failed:', error);
+        // Add notification to user
+        setTimeout(() => {
+            addBotMessage('⚠️ Kết nối API không ổn định. Một số tính năng có thể bị hạn chế.', true);
+        }, 1000);
     }
 }
 
-function streamText(text, onChunk){
-    let i = 0;
-    const step = Math.max(1, Math.floor(text.length/80));
-    const id = setInterval(()=>{
-    i += step;
-    onChunk(text.slice(0, i));
-    if(i >= text.length){ clearInterval(id); onChunk(text); }
-    }, 16);
-    return ()=> clearInterval(id);
+function initializeChatbot() {
+    // Auto-resize textarea
+    autoResizeTextarea(messageInput);
+    
+    // Focus on input
+    messageInput.focus();
+    
+    // Setup quick action buttons
+    setupQuickActions();
 }
 
-async function handleSend(){
-    const val = inputEl.value.trim();
-    if(!val) return;
-    addMessage('user', val);
-    inputEl.value = '';
-    setLoading(true);
+function setupEventListeners() {
+    // Send button click
+    sendButton.addEventListener('click', handleSendMessage);
+    
+    // Enter key to send message
+    messageInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage();
+        }
+    });
+    
+    // Input change to toggle send button
+    messageInput.addEventListener('input', function() {
+        const isEmpty = this.value.trim() === '';
+        sendButton.disabled = isEmpty;
+        
+        // Auto resize
+        autoResizeTextarea(this);
+    });
+    
+    // Hide quick actions when user starts typing
+    messageInput.addEventListener('focus', function() {
+        if (chatMessages.children.length === 1) { // Only welcome message
+            quickActions.style.display = 'block';
+        }
+    });
+}
 
-    // Placeholder assistant bubble to stream into
-    const node = elFromTemplate(tplAssistant);
-    const contentEl = node.querySelector('.content');
-    contentEl.textContent = '';
-    messagesEl.appendChild(node);
-    scrollToBottom();
+function setupQuickActions() {
+    const quickButtons = document.querySelectorAll('.quick-btn');
+    quickButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const question = this.getAttribute('data-question');
+            messageInput.value = question;
+            messageInput.focus();
+            sendButton.disabled = false;
+            
+            // Auto send the question
+            setTimeout(() => {
+                handleSendMessage();
+            }, 300);
+        });
+    });
+}
 
+function setWelcomeTime() {
+    const welcomeTimeElement = document.getElementById('welcomeTime');
+    if (welcomeTimeElement) {
+        welcomeTimeElement.textContent = formatTime(new Date());
+    }
+}
+
+async function handleSendMessage() {
+    const message = messageInput.value.trim();
+    if (message === '') return;
+    
+    console.log('🔵 Sending message:', message);
+    
+    // Hide quick actions after first message
+    if (chatMessages.children.length === 1) {
+        quickActions.style.display = 'none';
+    }
+    
+    // Add user message
+    addUserMessage(message);
+    
+    // Clear input
+    messageInput.value = '';
+    sendButton.disabled = true;
+    autoResizeTextarea(messageInput);
+    
+    // Show typing indicator
+    showTypingIndicator();
+    
     try {
-        const full = await sendMessageToBackend(val, messages);
-        contentEl.innerHTML = renderMarkdownLite(full);
-        scrollToBottom();
-        setLoading(false);
-        messages.push({ role: 'assistant', content: full });
-    } catch (err) {
-        contentEl.textContent = '⚠️ Đã có lỗi khi gọi API. Vui lòng thử lại.';
-        setLoading(false);
+        // Send message to backend
+        console.log('📤 Calling sendMessageToBackend...');
+        const response = await sendMessageToBackend(message);
+        console.log('📥 Received response:', response);
+        
+        // Hide typing indicator
+        hideTypingIndicator();
+        
+        // Add bot response
+        addBotMessage(response);
+        
+    } catch (error) {
+        console.error('❌ Error in handleSendMessage:', error);
+        hideTypingIndicator();
+        
+        // More specific error message
+        let errorMessage = 'Xin lỗi, đã có lỗi xảy ra. ';
+        if (error.message.includes('Failed to fetch')) {
+            errorMessage += 'Không thể kết nối với server. Vui lòng kiểm tra kết nối mạng.';
+        } else if (error.message.includes('404')) {
+            errorMessage += 'API endpoint không tồn tại.';
+        } else if (error.message.includes('500')) {
+            errorMessage += 'Lỗi server nội bộ.';
+        } else {
+            errorMessage += 'Vui lòng thử lại sau.';
+        }
+        
+        addBotMessage(errorMessage, true);
+    }
+    
+    // Focus back to input
+    messageInput.focus();
+}
+
+function addUserMessage(message) {
+    const messageDiv = createMessageElement(message, 'user');
+    chatMessages.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function addBotMessage(message, isError = false) {
+    const messageDiv = createMessageElement(message, 'bot', isError);
+    chatMessages.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function createMessageElement(message, sender, isError = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}-message`;
+    
+    const currentTime = formatTime(new Date());
+    
+    const avatarIcon = sender === 'user' ? 'fas fa-user' : 'fas fa-robot';
+    const errorClass = isError ? ' error' : '';
+    
+    // Format message content to preserve line breaks
+    const formattedMessage = formatMessageContent(message);
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            <i class="${avatarIcon}"></i>
+        </div>
+        <div class="message-content${errorClass}">
+            <div class="message-text">${formattedMessage}</div>
+        </div>
+        <div class="message-time">
+            <span>${currentTime}</span>
+        </div>
+    `;
+    
+    return messageDiv;
+}
+
+function showTypingIndicator() {
+    typingIndicator.style.display = 'flex';
+    scrollToBottom();
+}
+
+function hideTypingIndicator() {
+    typingIndicator.style.display = 'none';
+}
+
+function scrollToBottom() {
+    setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 100);
+}
+
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    const newHeight = Math.min(textarea.scrollHeight, 120);
+    textarea.style.height = newHeight + 'px';
+}
+
+function formatTime(date) {
+    return date.toLocaleTimeString('vi-VN', { 
+        hour: '2-digit', 
+        minute: '2-digit'
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatMessageContent(text) {
+    // Escape HTML first for security
+    const escapedText = escapeHtml(text);
+    // Replace line breaks with <br> tags to preserve formatting
+    return escapedText.replace(/\n/g, '<br>');
+}
+
+// Backend API Communication
+async function sendMessageToBackend(message) {
+    console.log('🌐 Starting API call to /chat');
+    
+    try {
+        const requestBody = {
+            message: message,
+            timestamp: new Date().toISOString()
+        };
+        
+        console.log('📤 Request body:', requestBody);
+        
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+        
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response ok:', response.ok);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Response error text:', errorText);
+            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Response data:', data);
+        
+        return data.reply || 'Tôi không thể trả lời câu hỏi này lúc này.';
+        
+    } catch (error) {
+        console.error('❌ Backend communication error:', error);
+        
+        // Check if it's a network error
+        if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {
+            console.log('🔄 Network error detected, using fallback response');
+            return generateFallbackResponse(message);
+        }
+        
+        // Re-throw the error to be handled by handleSendMessage
+        throw error;
     }
 }
 
-// Events
-sendBtn.addEventListener('click', handleSend);
-inputEl.addEventListener('keydown', (e)=>{
-    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); }
+// Fallback response for testing (remove when backend is connected)
+function generateFallbackResponse(message) {
+    const responses = [
+        'Cảm ơn bạn đã hỏi! Đây là phản hồi mẫu từ chatbot.',
+        'Tôi đã nhận được câu hỏi của bạn. Tính năng này đang được phát triển.',
+        'Rất tiếc, tôi chưa thể kết nối với hệ thống backend. Vui lòng thử lại sau.',
+        'Câu hỏi của bạn rất thú vị! Tôi sẽ cải thiện để trả lời tốt hơn.',
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
+}
+
+// Error handling
+window.addEventListener('error', function(e) {
+    console.error('Global error:', e.error);
 });
-clearBtn.addEventListener('click', ()=>{
-    messagesEl.innerHTML = '';
-    messages.length = 0;
-    addMessage('assistant', 'Đã tạo hội thoại mới. Hãy cho mình biết bạn quan tâm sản phẩm nào ✨');
+
+// Handle offline/online status
+window.addEventListener('online', function() {
+    console.log('Connection restored');
 });
 
-// Init
-addMessage('assistant', 'Chào bạn 👋 Mình là trợ lý tư vấn sản phẩm. Hãy đặt câu hỏi về các thiết bị điện tử/đồ thông minh nhé!');
+window.addEventListener('offline', function() {
+    console.log('Connection lost');
+    addBotMessage('Kết nối mạng bị gián đoạn. Vui lòng kiểm tra kết nối internet.', true);
+});
 
+// Utility functions
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 
-
-
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        formatTime,
+        escapeHtml,
+        createMessageElement
+    };
+}
