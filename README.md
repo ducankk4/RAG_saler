@@ -1,8 +1,8 @@
 # RAG_saler
 ## 1. Project Description
 
-*.* Real-time AI Chatbot Application for customer support, providing product information and answering inquiries.<br>
-*.* Approaches used:<br>
+**.** Real-time AI Chatbot Application for customer support, providing product information and answering inquiries.<br>
+**.** Approaches used:<br>
 Query rewriting, Function calling, Hybrid search, Reranking, Few-shot prompting
 
 ## 2. Tree Project
